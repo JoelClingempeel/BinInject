@@ -11,10 +11,10 @@ _start:
 	add	$34, %rsi
         mov     $36, %rdx
         syscall
-	push	%rax
-	push	%rdi
-	push	%rsi
-	push	%rdx
+	pop	%rdx
+	pop	%rsi
+	pop	%rdi
+	pop	%rax
 	lea	(%rip), %r10
 	sub	$0x1111, %r10  # Patch 0x111 with computed offset
 	jmp	%r10
