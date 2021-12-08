@@ -49,7 +49,7 @@ int find_code_segment (uint8_t* data) {
   
   int text_idx;
   for (int i = 0; i < ehdr->e_phnum; i++) {
-    if (phdr[i].p_flags & 5 == 5 && phdr[i].p_type == PT_LOAD) {
+    if ((phdr[i].p_flags & 5) == 5 && phdr[i].p_type == PT_LOAD) {
       printf("Code segment found at %d\n", i);
       return i;
     }
