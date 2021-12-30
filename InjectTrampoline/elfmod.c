@@ -75,7 +75,7 @@ void main(int argc, char* argv[]) {
 
   if (argc != 3) {
     printf("Usage: %s <src> <payload>\n", argv[0]);
-    return 0;
+    return;
   }
 
   target_fd = open_map_elf(argv[1], &target_data);
