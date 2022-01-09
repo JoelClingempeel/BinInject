@@ -1,4 +1,6 @@
 all: elfmod hello payload
+	rm hello
+	$(CC) hello.c -o hello
 
 elfmod: elfmod.c
 	$(CC) elfmod.c -o elfmod

